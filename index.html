@@ -310,7 +310,7 @@
         <div class="field"><div class="label-row"><label for="p1">Druck vor Ventil p1 [bar abs]</label><button class="mini-info" data-info="p1" type="button">!</button></div><input id="p1" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="p2">Druck nach Ventil p2 [bar abs]</label><button class="mini-info" data-info="p2" type="button">!</button></div><input id="p2" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="density">Relative Gasdichte [-]</label><button class="mini-info" data-info="density" type="button">!</button></div><input id="density" type="number" step="0.01" /></div>
-        <div class="field"><div class="label-row"><label for="temp">Temperatur [°C]</label><button class="mini-info" data-info="temp" type="button">!</button></div><input id="temp" type="number" step="1" /></div>
+        <div class="field" id="tempField"><div class="label-row"><label for="temp" id="tempLabel">Temperatur [°C]</label><button class="mini-info" data-info="temp" type="button">!</button></div><input id="temp" type="number" step="1" /></div>
         <div class="field" id="testOpeningField"><div class="label-row"><label for="testOpening" id="testOpeningLabel">Test-Öffnungsgrad [%] (optional)</label><button class="mini-info" data-info="testOpening" type="button">!</button></div><input id="testOpening" type="number" step="0.1" /></div>
 
         <div class="preset-row" id="gasPresets"></div>
@@ -391,6 +391,8 @@
         p2: document.getElementById('p2'),
         density: document.getElementById('density'),
         temp: document.getElementById('temp'),
+        tempField: document.getElementById('tempField'),
+        tempLabel: document.getElementById('tempLabel'),
         testOpening: document.getElementById('testOpening'),
         testOpeningField: document.getElementById('testOpeningField'),
         testOpeningLabel: document.getElementById('testOpeningLabel'),
@@ -658,6 +660,10 @@
         updateFlowUnitLabels();
         el.dpEffBox.style.display = el.dpLimit.checked ? 'block' : 'none';
         el.testOpeningResult.style.display = el.showTestOpening.checked ? 'block' : 'none';
+        const tempEnabled = el.calcModel.value === 'enhanced';
+        el.temp.disabled = !tempEnabled;
+        el.tempField.classList.toggle('disabled-field', !tempEnabled);
+        el.tempLabel.textContent = tempEnabled ? 'Temperatur [°C]' : 'Temperatur [°C] (nur enhanced)';
         el.testOpening.disabled = !el.showTestOpening.checked;
         el.testOpeningField.classList.toggle('disabled-field', !el.showTestOpening.checked);
         el.testOpeningLabel.textContent = el.showTestOpening.checked ? 'Test-Öffnungsgrad [%] (optional)' : 'Test-Öffnungsgrad [%] (deaktiviert)';
@@ -843,9 +849,9 @@
 
       function calculate() {
         const s = getState();
-        const validityValues = [s.qnMaxInput, s.qnMax, s.kvs, s.p1, s.p2, s.density, s.temp, ...(s.showTestOpening ? [s.testOpening] : [])];
+        const validityValues = [s.qnMaxInput, s.qnMax, s.kvs, s.p1, s.p2, s.density, ...(s.calcModel === 'enhanced' ? [s.temp] : []), ...(s.showTestOpening ? [s.testOpening] : [])];
         const valid = validityValues.every(v => Number.isFinite(v));
-        if (!valid || s.density <= 0 || s.qnMax < 0 || s.kvs <= 0 || s.p1 < 0 || s.p2 < 0 || s.temp <= -273.15) {
+        if (!valid || s.density <= 0 || s.qnMax < 0 || s.kvs <= 0 || s.p1 < 0 || s.p2 < 0 || (s.calcModel === 'enhanced' && s.temp <= -273.15)) {
           resetOutputs();
           setStatus('warn', 'Ungültige Eingaben');
           el.noteBox.textContent = 'Bitte Eingaben und Grenzen prüfen.';

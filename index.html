@@ -514,19 +514,23 @@
         el.formulaBox.style.display = 'block';
         const dpToken = el.dpLimit.checked ? 'Δp_eff' : 'Δp';
         const unit = getFlowUnit();
-        const conversionLine = 'ρN = d × 1.293 kg/Nm³';
+        const dRel = Number(el.density.value);
+        const rhoN = gasRhoN(Number.isFinite(dRel) ? dRel : 1);
+        const conversionLine = `ρN = d_rel × 1.293 kg/Nm³ = ${Number.isFinite(dRel) ? dRel.toFixed(4) : '—'} × 1.293 = ${Number.isFinite(rhoN) ? rhoN.toFixed(4) : '—'} kg/Nm³`;
+        const baseOpening = `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)))`;
         if (el.calcModel.value === 'simple') {
           el.formulaBox.textContent = unit === 'kgh'
             ? [
                 conversionLine,
-                'QN_max = ṁ_max / ρN',
-                `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d)))`,
-                '↔ direkt: Opening[%] = 100 × ṁ_max / (18.9 × Kvs × √(((Δp_x × (2p1 − Δp_x)) / d)) × ρN)'
+                'QN = ṁ / ρN   und   ṁ = QN × ρN',
+                'Für den Grenzwert: QN_max = ṁ_max / ρN',
+                baseOpening,
+                `↔ direkt in kg/h: Opening[%] = 100 × ṁ_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × ρN)`
               ].join('\n')
             : [
                 conversionLine,
-                'ṁ = QN × ρN',
-                `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d)))`
+                'QN = ṁ / ρN   und   ṁ = QN × ρN',
+                baseOpening
               ].join('\n');
         } else {
           el.formulaBox.textContent = [
@@ -536,11 +540,14 @@
             '1) Kv_eff = f(Öffnungsgrad, Kennlinie)',
             '2) F_T = √(293.15 / (273.15 + T))',
             unit === 'kgh'
-              ? `3) ṁ = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d)) × F_T × ρN`
-              : `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d)) × F_T`,
+              ? `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × F_T`
+              : `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × F_T`,
             unit === 'kgh'
-              ? '4) Max. Öffnungsgrad wird numerisch so gesucht, dass ṁ ≤ ṁ_max'
-              : '4) Max. Öffnungsgrad wird numerisch so gesucht, dass QN ≤ QN_max'
+              ? '4) ṁ = QN × ρN'
+              : '4) Ausgabe optional als ṁ über ṁ = QN × ρN',
+            unit === 'kgh'
+              ? '5) Max. Öffnungsgrad wird numerisch so gesucht, dass ṁ ≤ ṁ_max'
+              : '5) Max. Öffnungsgrad wird numerisch so gesucht, dass QN ≤ QN_max'
           ].join('\n');
         }
       }

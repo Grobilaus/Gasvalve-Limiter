@@ -246,9 +246,41 @@
     .dialog-inner h3 { margin: 0 0 0.5rem; color: var(--accent); }
     .dialog-inner p { margin: 0 0 0.4rem; color: #233347; }
 
+    .app-footer {
+      margin-top: 1rem;
+      padding: 0.9rem 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .footer-version {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fbfcff;
+      color: var(--text);
+      padding: 0.3rem 0.7rem;
+      white-space: nowrap;
+    }
+
+    .footer-version strong {
+      color: var(--accent);
+      letter-spacing: 0.03em;
+    }
+
     @media (max-width: 860px) {
       .grid { grid-template-columns: 1fr; }
       .result-grid { grid-template-columns: 1fr; }
+      .app-footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
@@ -340,6 +372,11 @@
       <h2 style="margin:0 0 0.7rem; color:#003A8F">Kennlinien-Diagramm</h2>
       <canvas id="chartCanvas" width="1400" height="650"></canvas>
     </section>
+
+    <footer class="card app-footer">
+      <span>Gasanschluss-Limiter für Stellventile</span>
+      <span class="footer-version">Version <strong id="appVersion">wird geladen</strong></span>
+    </footer>
   </div>
 
   <dialog id="infoDialog">
@@ -428,7 +465,8 @@
         dialogTitle: document.getElementById('dialogTitle'),
         dialogDesc: document.getElementById('dialogDesc'),
         dialogHint: document.getElementById('dialogHint'),
-        closeDialogBtn: document.getElementById('closeDialogBtn')
+        closeDialogBtn: document.getElementById('closeDialogBtn'),
+        appVersion: document.getElementById('appVersion')
       };
 
       const limitIds = ['limitQn', 'limitKvs', 'limitP1', 'limitP2', 'limitDensity', 'limitTemp', 'limitOpening'];
@@ -437,6 +475,7 @@
         .map(id => document.getElementById(id));
 
       let lastFlowUnit = 'Nm3h';
+      let selectedGasPreset = null;
 
       function getFlowUnit() {
         return el.flowUnitKg.checked ? 'kgh' : 'Nm3h';
@@ -454,6 +493,25 @@
       function flowFromNm3h(flowNm3h, flowUnit, density) {
         if (flowUnit === 'kgh') return flowNm3h * gasRhoN(density);
         return flowNm3h;
+      }
+
+      function formatVersionPart(value) {
+        return String(value).padStart(2, '0');
+      }
+
+      function getAutoVersion() {
+        const updatedAt = new Date(document.lastModified);
+        if (!Number.isFinite(updatedAt.getTime())) return 'v0.0.0-local';
+        return `v${updatedAt.getFullYear()}.${formatVersionPart(updatedAt.getMonth() + 1)}.${formatVersionPart(updatedAt.getDate())}.${formatVersionPart(updatedAt.getHours())}${formatVersionPart(updatedAt.getMinutes())}`;
+      }
+
+      function updateFooterVersion() {
+        if (!el.appVersion) return;
+        const updatedAt = new Date(document.lastModified);
+        el.appVersion.textContent = getAutoVersion();
+        if (Number.isFinite(updatedAt.getTime())) {
+          el.appVersion.title = `Dateistand ${new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(updatedAt)}`;
+        }
       }
 
       function updateFlowUnitLabels() {
@@ -484,6 +542,7 @@
         const payload = { ...getState() };
         limitIds.forEach(id => payload[id] = Number(document.getElementById(id).value));
         defaultIds.forEach(id => payload[id] = Number(document.getElementById(id).value));
+        payload.selectedGasPreset = selectedGasPreset;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       }
 
@@ -496,12 +555,24 @@
         }
       }
 
-      function setActiveGasButton() {
-        const d = Number(el.density.value);
-        const active = gasPresetMap.find(x => Math.abs(x.value - d) < 0.0001);
+      function syncGasPresetButtons() {
         el.gasPresets.querySelectorAll('button').forEach(btn => {
-          btn.classList.toggle('active', active && btn.dataset.gas === active.name);
+          btn.classList.toggle('active', btn.dataset.gas === selectedGasPreset);
         });
+      }
+
+      function selectGasPreset(name) {
+        selectedGasPreset = gasPresetMap.some(gas => gas.name === name) ? name : null;
+        syncGasPresetButtons();
+      }
+
+      function clearGasPresetSelection() {
+        selectedGasPreset = null;
+        syncGasPresetButtons();
+      }
+
+      function setActiveGasButton() {
+        syncGasPresetButtons();
       }
 
       function setStatus(kind, msg) {
@@ -681,6 +752,7 @@
         el.density.value = d.density;
         el.temp.value = d.temp;
         el.testOpening.value = d.testOpening;
+        clearGasPresetSelection();
         applySettings();
       }
 
@@ -925,6 +997,10 @@
 
         console.assert(flowToNm3h(129.3, 'kgh', 1) > 99.9 && flowToNm3h(129.3, 'kgh', 1) < 100.1, 'Test 9 failed: kg/h to Nm3/h conversion');
         console.assert(noLimit.dpTerm === 10, 'Test 8 failed: dpTerm mismatch for p1=10, p2=0 without limit');
+        selectGasPreset('CO₂');
+        console.assert(el.gasPresets.querySelector('[data-gas="CO₂"]').classList.contains('active'), 'Test 10 failed: preset button should become active');
+        clearGasPresetSelection();
+        console.assert(!el.gasPresets.querySelector('[data-gas="CO₂"]').classList.contains('active'), 'Test 11 failed: manual density change should clear preset selection');
       }
 
       function initPresets() {
@@ -936,7 +1012,7 @@
           btn.textContent = `${g.name} = ${g.value.toFixed(2)}`;
           btn.addEventListener('click', () => {
             el.density.value = g.value;
-            setActiveGasButton();
+            selectGasPreset(g.name);
             calculate();
           });
           el.gasPresets.appendChild(btn);
@@ -964,11 +1040,20 @@
       }
 
       function bindEvents() {
-        [el.qnMax, el.kvs, el.p1, el.p2, el.density, el.temp, el.testOpening].forEach(node => {
+        [el.qnMax, el.kvs, el.p1, el.p2, el.temp, el.testOpening].forEach(node => {
           node.addEventListener('input', () => {
             setActiveGasButton();
             calculate();
           });
+        });
+
+        el.density.addEventListener('input', () => {
+          clearGasPresetSelection();
+          calculate();
+        });
+        el.density.addEventListener('change', () => {
+          clearGasPresetSelection();
+          calculate();
         });
 
         [el.flowUnitNm, el.flowUnitKg].forEach(node => {
@@ -1023,7 +1108,7 @@
       function applyStoredState() {
         const defaults = {
           qnMax: 420, kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, testOpening: 50,
-          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false, flowUnit: 'Nm3h'
+          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false, flowUnit: 'Nm3h', selectedGasPreset: null
         };
         const saved = loadUserValues();
         const merged = { ...defaults, ...(saved || {}) };
@@ -1043,6 +1128,9 @@
         el.showTestOpening.checked = merged.showTestOpening !== false;
         el.valveChar.value = merged.valveChar || 'linear';
         el.calcModel.value = merged.calcModel || 'simple';
+        selectedGasPreset = gasPresetMap.some(gas => gas.name === merged.selectedGasPreset)
+          ? merged.selectedGasPreset
+          : null;
 
         limitIds.forEach(id => {
           if (saved && Number.isFinite(saved[id])) document.getElementById(id).value = saved[id];
@@ -1060,6 +1148,7 @@
       }
 
       initPresets();
+      updateFooterVersion();
       wireInfoDialogs();
       bindEvents();
       applyStoredState();

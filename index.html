@@ -436,6 +436,8 @@
       const settingsInputs = [...limitIds, ...defaultIds, 'showFormula', 'showTestOpening', 'dpLimit', 'valveChar', 'calcModel']
         .map(id => document.getElementById(id));
 
+      let lastFlowUnit = 'Nm3h';
+
       function getFlowUnit() {
         return el.flowUnitKg.checked ? 'kgh' : 'Nm3h';
       }
@@ -971,11 +973,14 @@
 
         [el.flowUnitNm, el.flowUnitKg].forEach(node => {
           node.addEventListener('change', () => {
-            const previousUnit = node.id === 'flowUnitKg' ? 'Nm3h' : 'kgh';
+            if (!node.checked) return;
+            const previousUnit = lastFlowUnit;
+            const nextUnit = getFlowUnit();
             const currentValue = Number(el.qnMax.value);
             const density = Number(el.density.value);
             const asNm3h = flowToNm3h(currentValue, previousUnit, density);
-            el.qnMax.value = flowFromNm3h(asNm3h, getFlowUnit(), density).toFixed(2);
+            el.qnMax.value = flowFromNm3h(asNm3h, nextUnit, density).toFixed(2);
+            lastFlowUnit = nextUnit;
             applySettings();
             calculate();
           });
@@ -1025,6 +1030,7 @@
 
         el.flowUnitNm.checked = (merged.flowUnit || 'Nm3h') !== 'kgh';
         el.flowUnitKg.checked = (merged.flowUnit || 'Nm3h') === 'kgh';
+        lastFlowUnit = getFlowUnit();
         el.qnMax.value = merged.qnMaxInput ?? merged.qnMax;
         el.kvs.value = merged.kvs;
         el.p1.value = merged.p1;

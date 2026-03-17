@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gasanschluss-Limiter für Stellventile</title>
+  <style>
+    :root {
+      --accent: #003A8F;
+      --accent-soft: #e8f0ff;
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --text: #1c2733;
+      --muted: #627286;
+      --line: #d4dde9;
+      --ok: #0f8a3b;
+      --warn: #b12f1f;
+      --radius: 14px;
+      --shadow: 0 6px 26px rgba(20, 36, 62, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.4;
+    }
+
+    .container {
+      max-width: 1300px;
+      margin: 1.2rem auto 2rem;
+      padding: 0 1rem;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid #e6edf8;
+    }
+
+    .header-card {
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 0.4rem;
+      color: var(--accent);
+      font-size: clamp(1.35rem, 2vw, 1.9rem);
+      font-weight: 750;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      max-width: 80ch;
+    }
+
+    .menu-wrap {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+    }
+
+    .menu-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+
+    .menu-btn:hover,
+    .menu-btn.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .menu-btn span,
+    .menu-btn span::before,
+    .menu-btn span::after {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: var(--accent);
+      content: "";
+      border-radius: 2px;
+      position: relative;
+    }
+
+    .menu-btn span::before { top: -6px; position: absolute; }
+    .menu-btn span::after { top: 6px; position: absolute; }
+
+    .settings-panel {
+      position: absolute;
+      right: 0;
+      top: 48px;
+      width: min(460px, calc(100vw - 2rem));
+      max-height: 72vh;
+      overflow: auto;
+      z-index: 10;
+      display: none;
+      padding: 1rem;
+    }
+
+    .settings-panel.open { display: block; }
+    .settings-section { border-top: 1px dashed var(--line); padding-top: 0.7rem; margin-top: 0.8rem; }
+    .settings-section:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+    .settings-title { margin: 0 0 0.5rem; color: var(--accent); font-size: 0.96rem; }
+
+    .hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      background: #f6f9ff;
+      border: 1px solid #e3edff;
+      border-radius: 8px;
+      padding: 0.45rem 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .panel { padding: 1rem; }
+    .panel h2 { margin: 0 0 0.8rem; color: var(--accent); font-size: 1.1rem; }
+
+    .field { margin-bottom: 0.72rem; }
+    .field.disabled-field {
+      opacity: 0.55;
+    }
+    .label-row { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.3rem; }
+    label { font-size: 0.9rem; color: #223143; }
+
+    input[type="number"], select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.48rem 0.55rem;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    .mini-info {
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.77rem;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .preset-row,
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.65rem; }
+
+    .btn, .preset-btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: #1f2b39;
+      border-radius: 9px;
+      padding: 0.45rem 0.7rem;
+      cursor: pointer;
+      font-size: 0.86rem;
+    }
+
+    .preset-btn.active,
+    .btn.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .result-box {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 0.6rem;
+      background: #fdfefe;
+    }
+
+    .result-name {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .result-value { margin-top: 0.2rem; font-size: 1.05rem; font-weight: 670; color: #172536; }
+
+    .status, .note, .formula {
+      margin-top: 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.62rem;
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+    }
+
+    .status.ok { border-color: #b6e9c8; background: #f3fff7; color: var(--ok); }
+    .status.warn { border-color: #f3c4bd; background: #fff6f5; color: var(--warn); }
+    .formula { background: #f8fbff; color: #2b3c4f; font-family: "Consolas", "Courier New", monospace; font-size: 0.82rem; }
+
+    #chartCard { margin-top: 1rem; padding: 1rem; display: none; }
+    #chartCard.open { display: block; }
+    canvas {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #dae5f5;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    dialog {
+      border: none;
+      border-radius: 10px;
+      padding: 0;
+      width: min(440px, calc(100vw - 2rem));
+      box-shadow: var(--shadow);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.42); }
+    .dialog-inner { padding: 1rem; }
+    .dialog-inner h3 { margin: 0 0 0.5rem; color: var(--accent); }
+    .dialog-inner p { margin: 0 0 0.4rem; color: #233347; }
+
+    @media (max-width: 860px) {
+      .grid { grid-template-columns: 1fr; }
+      .result-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="card header-card">
+      <h1>Gasanschluss-Limiter für Stellventile</h1>
+      <p class="subtitle">Standalone-Tool zur live Berechnung des maximal zulässigen Öffnungsgrads anhand von Anschlusswert, Ventildaten und Betriebsparametern. Diagramm und Ergebnisse aktualisieren sich bei jeder Eingabeänderung direkt.</p>
+      <div class="menu-wrap" id="menuWrap">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen"><span></span></button>
+        <div class="settings-panel card" id="settingsPanel">
+          <p class="hint">Änderungen in den Einstellungen werden direkt übernommen und gespeichert.</p>
+          <div class="settings-section">
+            <h3 class="settings-title">Anzeigeoptionen</h3>
+            <label><input type="checkbox" id="showFormula" checked /> Formel anzeigen</label><br />
+            <label><input type="checkbox" id="showTestOpening" /> Testöffnung verwenden & anzeigen</label>
+          </div>
+          <div class="settings-section">
+            <h3 class="settings-title">Modelloptionen</h3>
+            <label><input type="checkbox" id="dpLimit" checked /> Δp_eff auf 0.5 · p1 begrenzen</label>
+            <div class="field"><label for="valveChar">Ventilkennlinie</label><select id="valveChar"><option value="linear">linear</option><option value="equalPercentage">equalPercentage</option></select></div>
+            <div class="field"><label for="calcModel">Berechnungsmodell</label><select id="calcModel"><option value="simple">simple</option><option value="enhanced">enhanced</option></select></div>
+          </div>
+          <div class="settings-section">
+            <h3 class="settings-title">Maximalgrenzen</h3>
+            <div class="field"><label for="limitQn">QN max Obergrenze</label><input type="number" id="limitQn" value="50000" min="1" step="1" /></div>
+            <div class="field"><label for="limitKvs">Kvs Obergrenze</label><input type="number" id="limitKvs" value="1000" min="0.1" step="0.1" /></div>
+            <div class="field"><label for="limitP1">p1 Obergrenze</label><input type="number" id="limitP1" value="200" min="0.1" step="0.1" /></div>
+            <div class="field"><label for="limitP2">p2 Obergrenze</label><input type="number" id="limitP2" value="200" min="0" step="0.1" /></div>
+            <div class="field"><label for="limitDensity">Dichte Obergrenze</label><input type="number" id="limitDensity" value="10" min="0.01" step="0.01" /></div>
+            <div class="field"><label for="limitTemp">Temperatur Obergrenze</label><input type="number" id="limitTemp" value="600" min="-273" step="1" /></div>
+            <div class="field"><label for="limitOpening">Öffnung Obergrenze</label><input type="number" id="limitOpening" value="100" min="1" step="1" /></div>
+          </div>
+          <div class="settings-section">
+            <h3 class="settings-title">Voreinstellungen</h3>
+            <div class="field"><label for="defaultQn">Standard-QN</label><input type="number" id="defaultQn" value="420" step="1" /></div>
+            <div class="field"><label for="defaultKvs">Standard-Kvs</label><input type="number" id="defaultKvs" value="10" step="0.1" /></div>
+            <div class="field"><label for="defaultP1">Standard-p1</label><input type="number" id="defaultP1" value="10" step="0.1" /></div>
+            <div class="field"><label for="defaultP2">Standard-p2</label><input type="number" id="defaultP2" value="5" step="0.1" /></div>
+            <div class="field"><label for="defaultDensity">Standard-Dichte</label><input type="number" id="defaultDensity" value="1.53" step="0.01" /></div>
+            <div class="field"><label for="defaultTemp">Standard-Temperatur</label><input type="number" id="defaultTemp" value="20" step="1" /></div>
+            <div class="field"><label for="defaultTestOpening">Standard-Testöffnung</label><input type="number" id="defaultTestOpening" value="50" step="1" /></div>
+            <button class="btn" type="button" id="defaultsBtn">Standards</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main class="grid">
+      <section class="card panel">
+        <h2>Eingaben</h2>
+        <div class="field">
+          <div class="label-row"><label>Eingabeeinheit</label></div>
+          <label style="margin-right:1rem;"><input type="radio" name="flowUnit" id="flowUnitNm" value="Nm3h" checked /> Nm³/h</label>
+          <label><input type="radio" name="flowUnit" id="flowUnitKg" value="kgh" /> kg/h</label>
+        </div>
+        <div class="field"><div class="label-row"><label for="qnMax" id="qnMaxLabel">Max. Normvolumenstrom QN max [Nm³/h]</label><button class="mini-info" data-info="qnmax" type="button">!</button></div><input id="qnMax" type="number" step="0.1" /></div>
+        <div class="field"><div class="label-row"><label for="kvs">Kvs [-]</label><button class="mini-info" data-info="kvs" type="button">!</button></div><input id="kvs" type="number" step="0.1" /></div>
+        <div class="field"><div class="label-row"><label for="p1">Druck vor Ventil p1 [bar abs]</label><button class="mini-info" data-info="p1" type="button">!</button></div><input id="p1" type="number" step="0.1" /></div>
+        <div class="field"><div class="label-row"><label for="p2">Druck nach Ventil p2 [bar abs]</label><button class="mini-info" data-info="p2" type="button">!</button></div><input id="p2" type="number" step="0.1" /></div>
+        <div class="field"><div class="label-row"><label for="density">Relative Gasdichte [-]</label><button class="mini-info" data-info="density" type="button">!</button></div><input id="density" type="number" step="0.01" /></div>
+        <div class="field" id="tempField"><div class="label-row"><label for="temp" id="tempLabel">Temperatur [°C]</label><button class="mini-info" data-info="temp" type="button">!</button></div><input id="temp" type="number" step="1" /></div>
+        <div class="field" id="testOpeningField"><div class="label-row"><label for="testOpening" id="testOpeningLabel">Test-Öffnungsgrad [%] (optional)</label><button class="mini-info" data-info="testOpening" type="button">!</button></div><input id="testOpening" type="number" step="0.1" /></div>
+
+        <div class="preset-row" id="gasPresets"></div>
+        <div class="btn-row">
+          <button class="btn" type="button" id="resetBtn">Zurücksetzen</button>
+          <button class="btn" type="button" id="toggleChartBtn">Diagramm anzeigen</button>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>Ergebnisse</h2>
+        <div class="result-grid">
+          <div class="result-box"><div class="result-name">Δp [bar] <button class="mini-info" data-info="dp" type="button">!</button></div><div class="result-value" id="outDp">-</div></div>
+          <div class="result-box" id="dpEffBox"><div class="result-name">Δp_eff [bar] <button class="mini-info" data-info="dpEff" type="button">!</button></div><div class="result-value" id="outDpEff">-</div></div>
+          <div class="result-box"><div class="result-name" id="kvEffLabel"><span id="kvEffText">Kv_eff bei Testöffnung [-]</span> <button class="mini-info" data-info="kvEff" type="button">!</button></div><div class="result-value" id="outKvEff">-</div></div>
+          <div class="result-box"><div class="result-name">Max. Öffnungsgrad [%] <button class="mini-info" data-info="maxOpening" type="button">!</button></div><div class="result-value" id="outMaxOpening">-</div></div>
+          <div class="result-box"><div class="result-name"><span id="qnAtMaxLabel">QN bei max. Öffnung [Nm³/h]</span> <button class="mini-info" data-info="qnAtMax" type="button">!</button></div><div class="result-value" id="outQnAtMax">-</div></div>
+          <div class="result-box" id="testOpeningResult"><div class="result-name"><span id="qnAtTestLabel">QN bei Testöffnung [Nm³/h]</span> <button class="mini-info" data-info="qnAtTest" type="button">!</button></div><div class="result-value" id="outQnAtTest">-</div></div>
+        </div>
+        <div class="status" id="statusBox"></div>
+        <div class="note" id="noteBox"></div>
+        <div class="formula" id="formulaBox"></div>
+      </section>
+    </main>
+
+    <section class="card" id="chartCard">
+      <h2 style="margin:0 0 0.7rem; color:#003A8F">Kennlinien-Diagramm</h2>
+      <canvas id="chartCanvas" width="1400" height="650"></canvas>
+    </section>
+  </div>
+
+  <dialog id="infoDialog">
+    <div class="dialog-inner">
+      <h3 id="dialogTitle"></h3>
+      <p id="dialogDesc"></p>
+      <p id="dialogHint" style="color:#5a6b80; font-size:0.9rem"></p>
+      <button class="btn" id="closeDialogBtn" type="button">Schließen</button>
+    </div>
+  </dialog>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const STORAGE_KEY = 'gasLimiterState_v1';
+      const RANGEABILITY = 50;
+      const RHO_N_AIR = 1.293;
+      const gasPresetMap = [
+        { name: 'Luft', value: 1.0 },
+        { name: 'CO₂', value: 1.53 },
+        { name: 'N₂', value: 0.97 },
+        { name: 'O₂', value: 1.1 },
+        { name: 'Argon', value: 1.38 },
+        { name: 'H₂', value: 0.07 }
+      ];
+
+      const infoContent = {
+        qnmax: { title: 'Anschlusswert', desc: 'Maximal erlaubter Anschlusswert als Normvolumenstrom [Nm³/h] oder Massenstrom [kg/h], je nach gewählter Eingabeeinheit.' },
+        kvs: { title: 'Kvs', desc: 'Ventilkennwert bei 100 % Öffnung.' },
+        p1: { title: 'p1', desc: 'Absolutdruck vor dem Ventil.' },
+        p2: { title: 'p2', desc: 'Absolutdruck nach dem Ventil.' },
+        density: { title: 'Relative Gasdichte', desc: 'Gasdichte bezogen auf Luft (Luft = 1).' },
+        temp: { title: 'Temperatur', desc: 'Gastemperatur in °C für die Temperaturkorrektur im enhanced-Modell.' },
+        testOpening: { title: 'Test-Öffnungsgrad', desc: 'Öffnungsgrad, für den ein Vergleichsdurchfluss berechnet wird.' },
+        dp: { title: 'Δp', desc: 'Druckdifferenz p1 - p2, auf mindestens 0 begrenzt.' },
+        dpEff: { title: 'Δp_eff', desc: 'Effektive Druckdifferenz mit optionaler Begrenzung auf 0.5 · p1.' },
+        kvEff: { title: 'Kv_eff', desc: 'Effektiver Kv-Wert am Test-Öffnungsgrad entsprechend der Ventilkennlinie.' },
+        maxOpening: { title: 'Max. Öffnungsgrad', desc: 'Größter Öffnungsgrad, bei dem QN den Anschlusswert nicht überschreitet.' },
+        qnAtMax: { title: 'Durchfluss bei max. Öffnung', desc: 'Berechneter Durchfluss bei 100 % Öffnung (Referenzpunkt), in der gewählten Einheit.' },
+        qnAtTest: { title: 'Durchfluss bei Testöffnung', desc: 'Berechneter Durchfluss am eingestellten Test-Öffnungsgrad, in der gewählten Einheit.' }
+      };
+
+      const el = {
+        flowUnitNm: document.getElementById('flowUnitNm'),
+        flowUnitKg: document.getElementById('flowUnitKg'),
+        qnMax: document.getElementById('qnMax'),
+        qnMaxLabel: document.getElementById('qnMaxLabel'),
+        kvs: document.getElementById('kvs'),
+        p1: document.getElementById('p1'),
+        p2: document.getElementById('p2'),
+        density: document.getElementById('density'),
+        temp: document.getElementById('temp'),
+        tempField: document.getElementById('tempField'),
+        tempLabel: document.getElementById('tempLabel'),
+        testOpening: document.getElementById('testOpening'),
+        testOpeningField: document.getElementById('testOpeningField'),
+        testOpeningLabel: document.getElementById('testOpeningLabel'),
+        outDp: document.getElementById('outDp'),
+        outDpEff: document.getElementById('outDpEff'),
+        outKvEff: document.getElementById('outKvEff'),
+        kvEffText: document.getElementById('kvEffText'),
+        outMaxOpening: document.getElementById('outMaxOpening'),
+        outQnAtMax: document.getElementById('outQnAtMax'),
+        outQnAtTest: document.getElementById('outQnAtTest'),
+        qnAtMaxLabel: document.getElementById('qnAtMaxLabel'),
+        qnAtTestLabel: document.getElementById('qnAtTestLabel'),
+        statusBox: document.getElementById('statusBox'),
+        noteBox: document.getElementById('noteBox'),
+        formulaBox: document.getElementById('formulaBox'),
+        dpEffBox: document.getElementById('dpEffBox'),
+        testOpeningResult: document.getElementById('testOpeningResult'),
+        gasPresets: document.getElementById('gasPresets'),
+        resetBtn: document.getElementById('resetBtn'),
+        toggleChartBtn: document.getElementById('toggleChartBtn'),
+        chartCard: document.getElementById('chartCard'),
+        chartCanvas: document.getElementById('chartCanvas'),
+        menuBtn: document.getElementById('menuBtn'),
+        menuWrap: document.getElementById('menuWrap'),
+        settingsPanel: document.getElementById('settingsPanel'),
+        showFormula: document.getElementById('showFormula'),
+        showTestOpening: document.getElementById('showTestOpening'),
+        dpLimit: document.getElementById('dpLimit'),
+        valveChar: document.getElementById('valveChar'),
+        calcModel: document.getElementById('calcModel'),
+        defaultsBtn: document.getElementById('defaultsBtn'),
+        dialog: document.getElementById('infoDialog'),
+        dialogTitle: document.getElementById('dialogTitle'),
+        dialogDesc: document.getElementById('dialogDesc'),
+        dialogHint: document.getElementById('dialogHint'),
+        closeDialogBtn: document.getElementById('closeDialogBtn')
+      };
+
+      const limitIds = ['limitQn', 'limitKvs', 'limitP1', 'limitP2', 'limitDensity', 'limitTemp', 'limitOpening'];
+      const defaultIds = ['defaultQn', 'defaultKvs', 'defaultP1', 'defaultP2', 'defaultDensity', 'defaultTemp', 'defaultTestOpening'];
+      const settingsInputs = [...limitIds, ...defaultIds, 'showFormula', 'showTestOpening', 'dpLimit', 'valveChar', 'calcModel']
+        .map(id => document.getElementById(id));
+
+      function getFlowUnit() {
+        return el.flowUnitKg.checked ? 'kgh' : 'Nm3h';
+      }
+
+      function gasRhoN(density) {
+        return density * RHO_N_AIR;
+      }
+
+      function flowToNm3h(flowValue, flowUnit, density) {
+        if (flowUnit === 'kgh') return flowValue / Math.max(gasRhoN(density), 1e-9);
+        return flowValue;
+      }
+
+      function flowFromNm3h(flowNm3h, flowUnit, density) {
+        if (flowUnit === 'kgh') return flowNm3h * gasRhoN(density);
+        return flowNm3h;
+      }
+
+      function updateFlowUnitLabels() {
+        const unit = getFlowUnit();
+        if (unit === 'kgh') {
+          el.qnMaxLabel.textContent = 'Max. Massenstrom ṁ max [kg/h]';
+          el.qnAtMaxLabel.textContent = 'ṁ bei max. Öffnung [kg/h]';
+          el.qnAtTestLabel.textContent = 'ṁ bei Testöffnung [kg/h]';
+        } else {
+          el.qnMaxLabel.textContent = 'Max. Normvolumenstrom QN max [Nm³/h]';
+          el.qnAtMaxLabel.textContent = 'QN bei max. Öffnung [Nm³/h]';
+          el.qnAtTestLabel.textContent = 'QN bei Testöffnung [Nm³/h]';
+        }
+      }
+
+      function getState() {
+        return {
+          flowUnit: getFlowUnit(),
+          qnMaxInput: Number(el.qnMax.value),
+          qnMax: flowToNm3h(Number(el.qnMax.value), getFlowUnit(), Number(el.density.value)), kvs: Number(el.kvs.value), p1: Number(el.p1.value), p2: Number(el.p2.value),
+          density: Number(el.density.value), temp: Number(el.temp.value), testOpening: Number(el.testOpening.value),
+          dpLimit: el.dpLimit.checked, showFormula: el.showFormula.checked, showTestOpening: el.showTestOpening.checked,
+          valveChar: el.valveChar.value, calcModel: el.calcModel.value, chartOpen: el.chartCard.classList.contains('open')
+        };
+      }
+
+      function saveUserValues() {
+        const payload = { ...getState() };
+        limitIds.forEach(id => payload[id] = Number(document.getElementById(id).value));
+        defaultIds.forEach(id => payload[id] = Number(document.getElementById(id).value));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      }
+
+      function loadUserValues() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function setActiveGasButton() {
+        const d = Number(el.density.value);
+        const active = gasPresetMap.find(x => Math.abs(x.value - d) < 0.0001);
+        el.gasPresets.querySelectorAll('button').forEach(btn => {
+          btn.classList.toggle('active', active && btn.dataset.gas === active.name);
+        });
+      }
+
+      function setStatus(kind, msg) {
+        el.statusBox.classList.remove('ok', 'warn');
+        el.statusBox.classList.add(kind);
+        el.statusBox.textContent = msg;
+      }
+
+      function updateFormula(data) {
+        if (!el.showFormula.checked) {
+          el.formulaBox.style.display = 'none';
+          return;
+        }
+        el.formulaBox.style.display = 'block';
+        const dpToken = el.dpLimit.checked ? 'Δp_eff' : 'Δp';
+        const unit = getFlowUnit();
+        const dRel = Number(el.density.value);
+        const rhoN = gasRhoN(Number.isFinite(dRel) ? dRel : 1);
+        const conversionLine = `ρN = d_rel × 1.293 kg/Nm³ = ${Number.isFinite(dRel) ? dRel.toFixed(4) : '—'} × 1.293 = ${Number.isFinite(rhoN) ? rhoN.toFixed(4) : '—'} kg/Nm³`;
+        const baseOpening = `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)))`;
+        if (el.calcModel.value === 'simple') {
+          el.formulaBox.textContent = unit === 'kgh'
+            ? [
+                conversionLine,
+                'QN = ṁ / ρN   und   ṁ = QN × ρN',
+                'Für den Grenzwert: QN_max = ṁ_max / ρN',
+                baseOpening,
+                `↔ direkt in kg/h: Opening[%] = 100 × ṁ_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × ρN)`
+              ].join('\n')
+            : [
+                conversionLine,
+                'QN = ṁ / ρN   und   ṁ = QN × ρN',
+                baseOpening
+              ].join('\n');
+        } else {
+          el.formulaBox.textContent = [
+            'Verbessertes Engineering-Modell, aber keine vollständige IEC-60534-Auslegung.',
+            conversionLine,
+            unit === 'kgh' ? 'QN = ṁ / ρN' : 'ṁ = QN × ρN',
+            '1) Kv_eff = f(Öffnungsgrad, Kennlinie)',
+            '2) F_T = √(293.15 / (273.15 + T))',
+            unit === 'kgh'
+              ? `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × F_T`
+              : `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d_rel)) × F_T`,
+            unit === 'kgh'
+              ? '4) ṁ = QN × ρN'
+              : '4) Ausgabe optional als ṁ über ṁ = QN × ρN',
+            unit === 'kgh'
+              ? '5) Max. Öffnungsgrad wird numerisch so gesucht, dass ṁ ≤ ṁ_max'
+              : '5) Max. Öffnungsgrad wird numerisch so gesucht, dass QN ≤ QN_max'
+          ].join('\n');
+        }
+      }
+
+      function resetOutputs() {
+        [el.outDp, el.outDpEff, el.outKvEff, el.outMaxOpening, el.outQnAtMax, el.outQnAtTest].forEach(node => node.textContent = '-');
+      }
+
+      function openingToKvEff(opening, kvs, mode) {
+        const x = Math.max(0, Math.min(100, opening));
+        if (mode === 'equalPercentage') {
+          const minFactor = 1 / RANGEABILITY;
+          const factor = minFactor * Math.pow(RANGEABILITY, x / 100);
+          return kvs * factor;
+        }
+        return kvs * (x / 100);
+      }
+
+      function computeFlowNm3h(opening, inputs) {
+        const kvEff = openingToKvEff(opening, inputs.kvs, inputs.valveChar);
+        const dp = Math.max(inputs.p1 - inputs.p2, 0);
+        const dpTerm = inputs.dpLimit ? Math.min(dp, 0.5 * inputs.p1) : dp;
+        const core = (dpTerm * (2 * inputs.p1 - dpTerm)) / inputs.density;
+        if (!(core >= 0) || !Number.isFinite(core)) return NaN;
+        const ft = inputs.calcModel === 'enhanced' ? Math.sqrt(293.15 / (273.15 + inputs.temp)) : 1;
+        return 18.9 * kvEff * Math.sqrt(core) * ft;
+      }
+
+      function openingForFlow(inputs, targetQn) {
+        if (inputs.calcModel === 'simple' && inputs.valveChar === 'linear') {
+          const dp = Math.max(inputs.p1 - inputs.p2, 0);
+          const dpTerm = inputs.dpLimit ? Math.min(dp, 0.5 * inputs.p1) : dp;
+          const base = 18.9 * inputs.kvs * Math.sqrt((dpTerm * (2 * inputs.p1 - dpTerm)) / inputs.density);
+          if (!Number.isFinite(base) || base <= 0) return NaN;
+          return Math.max(0, Math.min(100, 100 * targetQn / base));
+        }
+        let low = 0;
+        let high = 100;
+        for (let i = 0; i < 36; i += 1) {
+          const mid = (low + high) / 2;
+          const q = computeFlowNm3h(mid, inputs);
+          if (!Number.isFinite(q)) return NaN;
+          if (q <= targetQn) low = mid;
+          else high = mid;
+        }
+        return low;
+      }
+
+      function calculateCore(inputs) {
+        const dp = Math.max(inputs.p1 - inputs.p2, 0);
+        const dpEff = Math.min(dp, 0.5 * inputs.p1);
+        const dpTerm = inputs.dpLimit ? dpEff : dp;
+        const kvEffAtTest = openingToKvEff(inputs.testOpening, inputs.kvs, inputs.valveChar);
+        const qnTest = computeFlowNm3h(inputs.testOpening, inputs);
+        const qnMaxOpen = computeFlowNm3h(100, inputs);
+        const maxOpening = openingForFlow(inputs, inputs.qnMax);
+        return { dp, dpEff, dpTerm, kvEffAtTest, qnTest, qnMaxOpen, maxOpening };
+      }
+
+      function applyInputLimits() {
+        const lim = {
+          qn: Number(document.getElementById('limitQn').value),
+          kvs: Number(document.getElementById('limitKvs').value),
+          p1: Number(document.getElementById('limitP1').value),
+          p2: Number(document.getElementById('limitP2').value),
+          density: Number(document.getElementById('limitDensity').value),
+          temp: Number(document.getElementById('limitTemp').value),
+          opening: Number(document.getElementById('limitOpening').value)
+        };
+        el.qnMax.max = lim.qn;
+        el.kvs.max = lim.kvs;
+        el.p1.max = lim.p1;
+        el.p2.max = lim.p2;
+        el.density.max = lim.density;
+        el.temp.max = lim.temp;
+        el.testOpening.max = lim.opening;
+      }
+
+      function clampInputsToLimits() {
+        const num = (node, min, max) => {
+          const v = Number(node.value);
+          node.value = Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : min;
+        };
+        num(el.qnMax, 0, Number(el.qnMax.max));
+        num(el.kvs, 0, Number(el.kvs.max));
+        num(el.p1, 0, Number(el.p1.max));
+        num(el.p2, 0, Number(el.p2.max));
+        num(el.density, 0.001, Number(el.density.max));
+        num(el.temp, -273.15, Number(el.temp.max));
+        num(el.testOpening, 0, Number(el.testOpening.max));
+      }
+
+      function loadDefaultSettings() {
+        return {
+          qnMax: Number(document.getElementById('defaultQn').value),
+          kvs: Number(document.getElementById('defaultKvs').value),
+          p1: Number(document.getElementById('defaultP1').value),
+          p2: Number(document.getElementById('defaultP2').value),
+          density: Number(document.getElementById('defaultDensity').value),
+          temp: Number(document.getElementById('defaultTemp').value),
+          testOpening: Number(document.getElementById('defaultTestOpening').value)
+        };
+      }
+
+      function applySettings() {
+        applyInputLimits();
+        clampInputsToLimits();
+        updateFlowUnitLabels();
+        el.dpEffBox.style.display = el.dpLimit.checked ? 'block' : 'none';
+        el.testOpeningResult.style.display = el.showTestOpening.checked ? 'block' : 'none';
+        const tempEnabled = el.calcModel.value === 'enhanced';
+        el.temp.disabled = !tempEnabled;
+        el.tempField.classList.toggle('disabled-field', !tempEnabled);
+        el.tempLabel.textContent = tempEnabled ? 'Temperatur [°C]' : 'Temperatur [°C] (nur enhanced)';
+        el.testOpening.disabled = !el.showTestOpening.checked;
+        el.testOpeningField.classList.toggle('disabled-field', !el.showTestOpening.checked);
+        el.testOpeningLabel.textContent = el.showTestOpening.checked ? 'Test-Öffnungsgrad [%] (optional)' : 'Test-Öffnungsgrad [%] (deaktiviert)';
+        el.kvEffText.textContent = el.showTestOpening.checked ? 'Kv_eff bei Testöffnung [-]' : 'Kv_eff bei Referenzöffnung [-]';
+      }
+
+      function resetForm() {
+        const d = loadDefaultSettings();
+        el.qnMax.value = d.qnMax;
+        el.kvs.value = d.kvs;
+        el.p1.value = d.p1;
+        el.p2.value = d.p2;
+        el.density.value = d.density;
+        el.temp.value = d.temp;
+        el.testOpening.value = d.testOpening;
+        applySettings();
+      }
+
+      function createChartData(inputs, points = 160) {
+        const data = [];
+        const safeP1 = Math.max(inputs.p1, 0.001);
+        for (let i = 0; i < points; i += 1) {
+          const p2 = (i / (points - 1)) * safeP1;
+          const sample = { ...inputs, p2 };
+          const opening = openingForFlow(sample, inputs.qnMax);
+          data.push({ p2, opening: Number.isFinite(opening) ? opening : 0 });
+        }
+        return data;
+      }
+
+      function drawChart(core, inputs) {
+        if (!el.chartCard.classList.contains('open')) return;
+        const ctx = el.chartCanvas.getContext('2d');
+        const w = el.chartCanvas.width;
+        const h = el.chartCanvas.height;
+        const pad = { l: 105, r: 42, t: 35, b: 88 };
+        const data = createChartData(inputs, 180);
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        const safeP1 = Math.max(inputs.p1, 0.001);
+
+        const xMap = (v) => pad.l + (v / safeP1) * plotW;
+        const yMap = (v) => h - pad.b - (v / 100) * plotH;
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+
+        // Minor grid for improved detail
+        ctx.strokeStyle = '#edf2fb';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 20; i += 1) {
+          const y = pad.t + (i / 20) * plotH;
+          ctx.beginPath();
+          ctx.moveTo(pad.l, y);
+          ctx.lineTo(w - pad.r, y);
+          ctx.stroke();
+        }
+        for (let i = 0; i <= 20; i += 1) {
+          const x = pad.l + (i / 20) * plotW;
+          ctx.beginPath();
+          ctx.moveTo(x, pad.t);
+          ctx.lineTo(x, h - pad.b);
+          ctx.stroke();
+        }
+
+        // Major grid and numeric ticks
+        ctx.strokeStyle = '#cfdbef';
+        ctx.fillStyle = '#50657f';
+        ctx.font = '18px Arial';
+        for (let i = 0; i <= 10; i += 1) {
+          const y = pad.t + (i / 10) * plotH;
+          const openingTick = 100 - i * 10;
+          ctx.beginPath();
+          ctx.moveTo(pad.l, y);
+          ctx.lineTo(w - pad.r, y);
+          ctx.stroke();
+          ctx.fillText(`${openingTick.toFixed(0)}%`, 46, y + 6);
+        }
+        for (let i = 0; i <= 10; i += 1) {
+          const x = pad.l + (i / 10) * plotW;
+          const p2Tick = (i / 10) * safeP1;
+          ctx.beginPath();
+          ctx.moveTo(x, pad.t);
+          ctx.lineTo(x, h - pad.b);
+          ctx.stroke();
+          ctx.fillText(p2Tick.toFixed(2), x - 20, h - pad.b + 28);
+        }
+
+        // Axes
+        ctx.strokeStyle = '#6e8199';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, pad.t);
+        ctx.lineTo(pad.l, h - pad.b);
+        ctx.lineTo(w - pad.r, h - pad.b);
+        ctx.stroke();
+
+        // Fill area under curve
+        ctx.beginPath();
+        data.forEach((pt, i) => {
+          const x = xMap(pt.p2);
+          const y = yMap(pt.opening);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xMap(data[data.length - 1].p2), yMap(0));
+        ctx.lineTo(xMap(data[0].p2), yMap(0));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 58, 143, 0.10)';
+        ctx.fill();
+
+        // Main curve
+        ctx.strokeStyle = '#003A8F';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        data.forEach((pt, i) => {
+          const x = xMap(pt.p2);
+          const y = yMap(pt.opening);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Current operating point + helper lines
+        const currentX = xMap(Math.max(0, Math.min(inputs.p2, safeP1)));
+        const currentY = yMap(core.maxOpening);
+
+        ctx.strokeStyle = 'rgba(177, 41, 29, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 6]);
+        ctx.beginPath();
+        ctx.moveTo(currentX, h - pad.b);
+        ctx.lineTo(currentX, currentY);
+        ctx.moveTo(pad.l, currentY);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#b1291d';
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Annotation card
+        const infoX = w - 340;
+        const infoY = 50;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = '#c8d8ef';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(infoX, infoY, 290, 92);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#1f3550';
+        ctx.font = '17px Arial';
+        ctx.fillText('Arbeitspunkt', infoX + 12, infoY + 24);
+        ctx.fillText(`p2: ${inputs.p2.toFixed(2)} bar abs`, infoX + 12, infoY + 48);
+        ctx.fillText(`max. Öffnung: ${core.maxOpening.toFixed(2)} %`, infoX + 12, infoY + 71);
+
+        // Legend
+        ctx.fillStyle = '#1e3248';
+        ctx.font = '18px Arial';
+        ctx.fillRect(pad.l + 8, pad.t + 8, 24, 4);
+        ctx.fillText('Kurve: max. Öffnung über p2', pad.l + 42, pad.t + 18);
+        ctx.fillStyle = '#b1291d';
+        ctx.beginPath();
+        ctx.arc(pad.l + 20, pad.t + 42, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1e3248';
+        ctx.fillText('Roter Punkt: aktueller Arbeitspunkt', pad.l + 42, pad.t + 48);
+
+        // Axis titles
+        ctx.fillStyle = '#1e3248';
+        ctx.font = '22px Arial';
+        ctx.fillText('Tankdruck p2 [bar abs]', w / 2 - 110, h - 26);
+        ctx.save();
+        ctx.translate(34, h / 2 + 100);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Max. Öffnungsgrad [%]', 0, 0);
+        ctx.restore();
+      }
+
+      function calculate() {
+        const s = getState();
+        const validityValues = [s.qnMaxInput, s.qnMax, s.kvs, s.p1, s.p2, s.density, ...(s.calcModel === 'enhanced' ? [s.temp] : []), ...(s.showTestOpening ? [s.testOpening] : [])];
+        const valid = validityValues.every(v => Number.isFinite(v));
+        if (!valid || s.density <= 0 || s.qnMax < 0 || s.kvs <= 0 || s.p1 < 0 || s.p2 < 0 || (s.calcModel === 'enhanced' && s.temp <= -273.15)) {
+          resetOutputs();
+          setStatus('warn', 'Ungültige Eingaben');
+          el.noteBox.textContent = 'Bitte Eingaben und Grenzen prüfen.';
+          updateFormula(null);
+          return;
+        }
+        const core = calculateCore(s);
+        const allFinite = [core.dp, core.dpEff, core.kvEffAtTest, core.maxOpening, core.qnMaxOpen, core.qnTest].every(Number.isFinite);
+        if (!allFinite) {
+          resetOutputs();
+          setStatus('warn', 'Berechnung nicht möglich');
+          el.noteBox.textContent = 'Die aktuellen Parameter führen zu keinem stabilen Ergebnis.';
+          updateFormula(core);
+          return;
+        }
+
+        el.outDp.textContent = core.dp.toFixed(3);
+        el.outDpEff.textContent = core.dpEff.toFixed(3);
+        el.outKvEff.textContent = s.showTestOpening ? core.kvEffAtTest.toFixed(4) : openingToKvEff(100, s.kvs, s.valveChar).toFixed(4);
+        el.outMaxOpening.textContent = core.maxOpening.toFixed(2);
+        el.outQnAtMax.textContent = flowFromNm3h(core.qnMaxOpen, s.flowUnit, s.density).toFixed(2);
+        el.outQnAtTest.textContent = flowFromNm3h(core.qnTest, s.flowUnit, s.density).toFixed(2);
+
+        if (s.showTestOpening && core.qnTest > s.qnMax) setStatus('warn', 'Testöffnung überschreitet Anschlusswert');
+        else setStatus('ok', 'Berechnung gültig');
+
+        if (s.calcModel === 'enhanced') {
+          el.noteBox.textContent = 'Physikalisch genaueres Modell aktiv: mit Temperaturkorrektur und numerischer Bestimmung des maximalen Öffnungsgrads.';
+        } else if (s.dpLimit && core.dp > core.dpEff) {
+          el.noteBox.textContent = 'Hinweis: Δp_eff wurde auf 0.5·p1 begrenzt.';
+        } else if (!s.dpLimit) {
+          el.noteBox.textContent = 'Hinweis: Δp-Begrenzung ist deaktiviert. Für Tankstart bei 0 bar anschaulich, bildet jedoch kritische Strömung nicht ab.';
+        } else {
+          el.noteBox.textContent = 'Standardmodell aktiv.';
+        }
+
+        updateFormula(core);
+        drawChart(core, s);
+        setActiveGasButton();
+        saveUserValues();
+      }
+
+      function runTests() {
+        const sample = { qnMaxInput: 420, qnMax: 420, flowUnit: 'Nm3h', kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, dpLimit: true, valveChar: 'linear', calcModel: 'simple' };
+        const eq = openingToKvEff(10, 10, 'equalPercentage');
+        const lin = openingToKvEff(10, 10, 'linear');
+        console.assert(eq < lin, 'Test 1 failed: equalPercentage at low opening should be lower than linear');
+
+        const cool = computeFlowNm3h(60, { ...sample, calcModel: 'enhanced', temp: 0 });
+        const hot = computeFlowNm3h(60, { ...sample, calcModel: 'enhanced', temp: 180 });
+        console.assert(Math.abs(cool - hot) > 0.01, 'Test 2 failed: enhanced model must depend on temperature');
+
+        const simpleLinOpening = openingForFlow({ ...sample, calcModel: 'simple', valveChar: 'linear' }, 420);
+        console.assert(simpleLinOpening >= 0 && simpleLinOpening <= 100 && Number.isFinite(simpleLinOpening), 'Test 3 failed: simple+linear opening range');
+
+        const chartData = createChartData({ ...sample, qnMax: 420, testOpening: 50 }, 77);
+        console.assert(chartData.length === 77, 'Test 4 failed: chart data size mismatch');
+
+        el.dpLimit.checked = false;
+        updateFormula({});
+        console.assert(!el.formulaBox.textContent.includes('Δp_eff'), 'Test 5 failed: formula should not include Δp_eff when disabled');
+
+        saveUserValues();
+        console.assert(Boolean(localStorage.getItem(STORAGE_KEY)), 'Test 6 failed: storage key missing');
+
+        console.assert(openingToKvEff(50, 12, 'linear') === 6, 'Test 7 failed: linear Kv_eff at 50%');
+
+        const noLimit = calculateCore({ ...sample, p2: 0, dpLimit: false, qnMax: 420, testOpening: 50 });
+
+        console.assert(flowToNm3h(129.3, 'kgh', 1) > 99.9 && flowToNm3h(129.3, 'kgh', 1) < 100.1, 'Test 9 failed: kg/h to Nm3/h conversion');
+        console.assert(noLimit.dpTerm === 10, 'Test 8 failed: dpTerm mismatch for p1=10, p2=0 without limit');
+      }
+
+      function initPresets() {
+        gasPresetMap.forEach(g => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'preset-btn';
+          btn.dataset.gas = g.name;
+          btn.textContent = `${g.name} = ${g.value.toFixed(2)}`;
+          btn.addEventListener('click', () => {
+            el.density.value = g.value;
+            setActiveGasButton();
+            calculate();
+          });
+          el.gasPresets.appendChild(btn);
+        });
+      }
+
+      function wireInfoDialogs() {
+        document.querySelectorAll('[data-info]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const item = infoContent[btn.dataset.info];
+            if (!item) return;
+            el.dialogTitle.textContent = item.title;
+            el.dialogDesc.textContent = item.desc;
+            el.dialogHint.textContent = item.hint || '';
+            el.dialog.showModal();
+          });
+        });
+
+        el.closeDialogBtn.addEventListener('click', () => el.dialog.close());
+        el.dialog.addEventListener('click', (ev) => {
+          const rect = el.dialog.getBoundingClientRect();
+          const inside = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+          if (!inside) el.dialog.close();
+        });
+      }
+
+      function bindEvents() {
+        [el.qnMax, el.kvs, el.p1, el.p2, el.density, el.temp, el.testOpening].forEach(node => {
+          node.addEventListener('input', () => {
+            setActiveGasButton();
+            calculate();
+          });
+        });
+
+        [el.flowUnitNm, el.flowUnitKg].forEach(node => {
+          node.addEventListener('change', () => {
+            const previousUnit = node.id === 'flowUnitKg' ? 'Nm3h' : 'kgh';
+            const currentValue = Number(el.qnMax.value);
+            const density = Number(el.density.value);
+            const asNm3h = flowToNm3h(currentValue, previousUnit, density);
+            el.qnMax.value = flowFromNm3h(asNm3h, getFlowUnit(), density).toFixed(2);
+            applySettings();
+            calculate();
+          });
+        });
+
+        settingsInputs.forEach(node => {
+          node.addEventListener('input', () => {
+            applySettings();
+            calculate();
+          });
+          node.addEventListener('change', () => {
+            applySettings();
+            calculate();
+          });
+        });
+
+        el.resetBtn.addEventListener('click', () => { resetForm(); calculate(); });
+        el.defaultsBtn.addEventListener('click', () => { resetForm(); calculate(); });
+
+        el.toggleChartBtn.addEventListener('click', () => {
+          const open = el.chartCard.classList.toggle('open');
+          el.toggleChartBtn.classList.toggle('active', open);
+          el.toggleChartBtn.textContent = open ? 'Diagramm ausblenden' : 'Diagramm anzeigen';
+          calculate();
+        });
+
+        el.menuBtn.addEventListener('click', () => {
+          const open = el.settingsPanel.classList.toggle('open');
+          el.menuBtn.classList.toggle('active', open);
+        });
+
+        document.addEventListener('click', (ev) => {
+          if (!el.menuWrap.contains(ev.target)) {
+            el.settingsPanel.classList.remove('open');
+            el.menuBtn.classList.remove('active');
+          }
+        });
+      }
+
+      function applyStoredState() {
+        const defaults = {
+          qnMax: 420, kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, testOpening: 50,
+          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false, flowUnit: 'Nm3h'
+        };
+        const saved = loadUserValues();
+        const merged = { ...defaults, ...(saved || {}) };
+
+        el.flowUnitNm.checked = (merged.flowUnit || 'Nm3h') !== 'kgh';
+        el.flowUnitKg.checked = (merged.flowUnit || 'Nm3h') === 'kgh';
+        el.qnMax.value = merged.qnMaxInput ?? merged.qnMax;
+        el.kvs.value = merged.kvs;
+        el.p1.value = merged.p1;
+        el.p2.value = merged.p2;
+        el.density.value = merged.density;
+        el.temp.value = merged.temp;
+        el.testOpening.value = merged.testOpening;
+        el.dpLimit.checked = !!merged.dpLimit;
+        el.showFormula.checked = merged.showFormula !== false;
+        el.showTestOpening.checked = merged.showTestOpening !== false;
+        el.valveChar.value = merged.valveChar || 'linear';
+        el.calcModel.value = merged.calcModel || 'simple';
+
+        limitIds.forEach(id => {
+          if (saved && Number.isFinite(saved[id])) document.getElementById(id).value = saved[id];
+        });
+        defaultIds.forEach(id => {
+          if (saved && Number.isFinite(saved[id])) document.getElementById(id).value = saved[id];
+        });
+
+        applySettings();
+        if (merged.chartOpen) {
+          el.chartCard.classList.add('open');
+          el.toggleChartBtn.classList.add('active');
+          el.toggleChartBtn.textContent = 'Diagramm ausblenden';
+        }
+      }
+
+      initPresets();
+      wireInfoDialogs();
+      bindEvents();
+      applyStoredState();
+      calculate();
+      runTests();
+    });
+  </script>
+</body>
+</html>

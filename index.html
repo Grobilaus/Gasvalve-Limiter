@@ -1039,8 +1039,12 @@
         el.temp.value = merged.temp;
         el.testOpening.value = merged.testOpening;
         el.dpLimit.checked = !!merged.dpLimit;
-        el.showFormula.checked = merged.showFormula !== false;
-        el.showTestOpening.checked = merged.showTestOpening !== false;
+        el.showFormula.checked = Object.prototype.hasOwnProperty.call(merged, 'showFormula')
+          ? !!merged.showFormula
+          : defaults.showFormula;
+        el.showTestOpening.checked = Object.prototype.hasOwnProperty.call(merged, 'showTestOpening')
+          ? !!merged.showTestOpening
+          : defaults.showTestOpening;
         el.valveChar.value = merged.valveChar || 'linear';
         el.calcModel.value = merged.calcModel || 'simple';
 

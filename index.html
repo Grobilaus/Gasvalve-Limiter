@@ -137,6 +137,9 @@
     .panel h2 { margin: 0 0 0.8rem; color: var(--accent); font-size: 1.1rem; }
 
     .field { margin-bottom: 0.72rem; }
+    .field.disabled-field {
+      opacity: 0.55;
+    }
     .label-row { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.3rem; }
     label { font-size: 0.9rem; color: #223143; }
 
@@ -253,7 +256,7 @@
   <div class="container">
     <section class="card header-card">
       <h1>Gasanschluss-Limiter für Stellventile</h1>
-      <p class="subtitle">Standalone-Tool zur live Berechnung des maximal zulässigen Öffnungsgrads anhand von Anschlusswert, Ventildaten und Betriebsparametern.</p>
+      <p class="subtitle">Standalone-Tool zur live Berechnung des maximal zulässigen Öffnungsgrads anhand von Anschlusswert, Ventildaten und Betriebsparametern. Diagramm und Ergebnisse aktualisieren sich bei jeder Eingabeänderung direkt.</p>
       <div class="menu-wrap" id="menuWrap">
         <button class="menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen"><span></span></button>
         <div class="settings-panel card" id="settingsPanel">
@@ -261,7 +264,7 @@
           <div class="settings-section">
             <h3 class="settings-title">Anzeigeoptionen</h3>
             <label><input type="checkbox" id="showFormula" checked /> Formel anzeigen</label><br />
-            <label><input type="checkbox" id="showTestOpening" checked /> Testöffnung anzeigen</label>
+            <label><input type="checkbox" id="showTestOpening" /> Testöffnung verwenden & anzeigen</label>
           </div>
           <div class="settings-section">
             <h3 class="settings-title">Modelloptionen</h3>
@@ -303,7 +306,7 @@
         <div class="field"><div class="label-row"><label for="p2">Druck nach Ventil p2 [bar abs]</label><button class="mini-info" data-info="p2" type="button">!</button></div><input id="p2" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="density">Relative Gasdichte [-]</label><button class="mini-info" data-info="density" type="button">!</button></div><input id="density" type="number" step="0.01" /></div>
         <div class="field"><div class="label-row"><label for="temp">Temperatur [°C]</label><button class="mini-info" data-info="temp" type="button">!</button></div><input id="temp" type="number" step="1" /></div>
-        <div class="field"><div class="label-row"><label for="testOpening">Test-Öffnungsgrad [%]</label><button class="mini-info" data-info="testOpening" type="button">!</button></div><input id="testOpening" type="number" step="0.1" /></div>
+        <div class="field" id="testOpeningField"><div class="label-row"><label for="testOpening" id="testOpeningLabel">Test-Öffnungsgrad [%] (optional)</label><button class="mini-info" data-info="testOpening" type="button">!</button></div><input id="testOpening" type="number" step="0.1" /></div>
 
         <div class="preset-row" id="gasPresets"></div>
         <div class="btn-row">
@@ -317,7 +320,7 @@
         <div class="result-grid">
           <div class="result-box"><div class="result-name">Δp [bar] <button class="mini-info" data-info="dp" type="button">!</button></div><div class="result-value" id="outDp">-</div></div>
           <div class="result-box" id="dpEffBox"><div class="result-name">Δp_eff [bar] <button class="mini-info" data-info="dpEff" type="button">!</button></div><div class="result-value" id="outDpEff">-</div></div>
-          <div class="result-box"><div class="result-name">Kv_eff bei Testöffnung [-] <button class="mini-info" data-info="kvEff" type="button">!</button></div><div class="result-value" id="outKvEff">-</div></div>
+          <div class="result-box"><div class="result-name" id="kvEffLabel"><span id="kvEffText">Kv_eff bei Testöffnung [-]</span> <button class="mini-info" data-info="kvEff" type="button">!</button></div><div class="result-value" id="outKvEff">-</div></div>
           <div class="result-box"><div class="result-name">Max. Öffnungsgrad [%] <button class="mini-info" data-info="maxOpening" type="button">!</button></div><div class="result-value" id="outMaxOpening">-</div></div>
           <div class="result-box"><div class="result-name">QN bei max. Öffnung [Nm³/h] <button class="mini-info" data-info="qnAtMax" type="button">!</button></div><div class="result-value" id="outQnAtMax">-</div></div>
           <div class="result-box" id="testOpeningResult"><div class="result-name">QN bei Testöffnung [Nm³/h] <button class="mini-info" data-info="qnAtTest" type="button">!</button></div><div class="result-value" id="outQnAtTest">-</div></div>
@@ -380,9 +383,12 @@
         density: document.getElementById('density'),
         temp: document.getElementById('temp'),
         testOpening: document.getElementById('testOpening'),
+        testOpeningField: document.getElementById('testOpeningField'),
+        testOpeningLabel: document.getElementById('testOpeningLabel'),
         outDp: document.getElementById('outDp'),
         outDpEff: document.getElementById('outDpEff'),
         outKvEff: document.getElementById('outKvEff'),
+        kvEffText: document.getElementById('kvEffText'),
         outMaxOpening: document.getElementById('outMaxOpening'),
         outQnAtMax: document.getElementById('outQnAtMax'),
         outQnAtTest: document.getElementById('outQnAtTest'),
@@ -581,6 +587,10 @@
         clampInputsToLimits();
         el.dpEffBox.style.display = el.dpLimit.checked ? 'block' : 'none';
         el.testOpeningResult.style.display = el.showTestOpening.checked ? 'block' : 'none';
+        el.testOpening.disabled = !el.showTestOpening.checked;
+        el.testOpeningField.classList.toggle('disabled-field', !el.showTestOpening.checked);
+        el.testOpeningLabel.textContent = el.showTestOpening.checked ? 'Test-Öffnungsgrad [%] (optional)' : 'Test-Öffnungsgrad [%] (deaktiviert)';
+        el.kvEffText.textContent = el.showTestOpening.checked ? 'Kv_eff bei Testöffnung [-]' : 'Kv_eff bei Referenzöffnung [-]';
       }
 
       function resetForm() {
@@ -595,7 +605,7 @@
         applySettings();
       }
 
-      function createChartData(inputs, points = 80) {
+      function createChartData(inputs, points = 160) {
         const data = [];
         const safeP1 = Math.max(inputs.p1, 0.001);
         for (let i = 0; i < points; i += 1) {
@@ -612,28 +622,86 @@
         const ctx = el.chartCanvas.getContext('2d');
         const w = el.chartCanvas.width;
         const h = el.chartCanvas.height;
-        const pad = { l: 80, r: 35, t: 35, b: 65 };
-        const data = createChartData(inputs, 90);
+        const pad = { l: 105, r: 42, t: 35, b: 88 };
+        const data = createChartData(inputs, 180);
+        const plotW = w - pad.l - pad.r;
+        const plotH = h - pad.t - pad.b;
+        const safeP1 = Math.max(inputs.p1, 0.001);
+
+        const xMap = (v) => pad.l + (v / safeP1) * plotW;
+        const yMap = (v) => h - pad.b - (v / 100) * plotH;
+
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, w, h);
 
-        ctx.strokeStyle = '#dce6f5';
+        // Minor grid for improved detail
+        ctx.strokeStyle = '#edf2fb';
         ctx.lineWidth = 1;
-        for (let i = 0; i <= 10; i += 1) {
-          const y = pad.t + (i / 10) * (h - pad.t - pad.b);
-          ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+        for (let i = 0; i <= 20; i += 1) {
+          const y = pad.t + (i / 20) * plotH;
+          ctx.beginPath();
+          ctx.moveTo(pad.l, y);
+          ctx.lineTo(w - pad.r, y);
+          ctx.stroke();
         }
-        for (let i = 0; i <= 10; i += 1) {
-          const x = pad.l + (i / 10) * (w - pad.l - pad.r);
-          ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b); ctx.stroke();
+        for (let i = 0; i <= 20; i += 1) {
+          const x = pad.l + (i / 20) * plotW;
+          ctx.beginPath();
+          ctx.moveTo(x, pad.t);
+          ctx.lineTo(x, h - pad.b);
+          ctx.stroke();
         }
 
-        const xMap = (v) => pad.l + (v / Math.max(inputs.p1, 0.001)) * (w - pad.l - pad.r);
-        const yMap = (v) => h - pad.b - (v / 100) * (h - pad.t - pad.b);
+        // Major grid and numeric ticks
+        ctx.strokeStyle = '#cfdbef';
+        ctx.fillStyle = '#50657f';
+        ctx.font = '18px Arial';
+        for (let i = 0; i <= 10; i += 1) {
+          const y = pad.t + (i / 10) * plotH;
+          const openingTick = 100 - i * 10;
+          ctx.beginPath();
+          ctx.moveTo(pad.l, y);
+          ctx.lineTo(w - pad.r, y);
+          ctx.stroke();
+          ctx.fillText(`${openingTick.toFixed(0)}%`, 46, y + 6);
+        }
+        for (let i = 0; i <= 10; i += 1) {
+          const x = pad.l + (i / 10) * plotW;
+          const p2Tick = (i / 10) * safeP1;
+          ctx.beginPath();
+          ctx.moveTo(x, pad.t);
+          ctx.lineTo(x, h - pad.b);
+          ctx.stroke();
+          ctx.fillText(p2Tick.toFixed(2), x - 20, h - pad.b + 28);
+        }
 
+        // Axes
+        ctx.strokeStyle = '#6e8199';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(pad.l, pad.t);
+        ctx.lineTo(pad.l, h - pad.b);
+        ctx.lineTo(w - pad.r, h - pad.b);
+        ctx.stroke();
+
+        // Fill area under curve
+        ctx.beginPath();
+        data.forEach((pt, i) => {
+          const x = xMap(pt.p2);
+          const y = yMap(pt.opening);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xMap(data[data.length - 1].p2), yMap(0));
+        ctx.lineTo(xMap(data[0].p2), yMap(0));
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 58, 143, 0.10)';
+        ctx.fill();
+
+        // Main curve
         ctx.strokeStyle = '#003A8F';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.beginPath();
         data.forEach((pt, i) => {
           const x = xMap(pt.p2);
@@ -643,16 +711,60 @@
         });
         ctx.stroke();
 
+        // Current operating point + helper lines
+        const currentX = xMap(Math.max(0, Math.min(inputs.p2, safeP1)));
+        const currentY = yMap(core.maxOpening);
+
+        ctx.strokeStyle = 'rgba(177, 41, 29, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 6]);
+        ctx.beginPath();
+        ctx.moveTo(currentX, h - pad.b);
+        ctx.lineTo(currentX, currentY);
+        ctx.moveTo(pad.l, currentY);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
         ctx.fillStyle = '#b1291d';
         ctx.beginPath();
-        ctx.arc(xMap(inputs.p2), yMap(core.maxOpening), 6, 0, Math.PI * 2);
+        ctx.arc(currentX, currentY, 7, 0, Math.PI * 2);
         ctx.fill();
 
+        // Annotation card
+        const infoX = w - 340;
+        const infoY = 50;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = '#c8d8ef';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(infoX, infoY, 290, 92);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#1f3550';
+        ctx.font = '17px Arial';
+        ctx.fillText('Arbeitspunkt', infoX + 12, infoY + 24);
+        ctx.fillText(`p2: ${inputs.p2.toFixed(2)} bar abs`, infoX + 12, infoY + 48);
+        ctx.fillText(`max. Öffnung: ${core.maxOpening.toFixed(2)} %`, infoX + 12, infoY + 71);
+
+        // Legend
+        ctx.fillStyle = '#1e3248';
+        ctx.font = '18px Arial';
+        ctx.fillRect(pad.l + 8, pad.t + 8, 24, 4);
+        ctx.fillText('Kurve: max. Öffnung über p2', pad.l + 42, pad.t + 18);
+        ctx.fillStyle = '#b1291d';
+        ctx.beginPath();
+        ctx.arc(pad.l + 20, pad.t + 42, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1e3248';
+        ctx.fillText('Roter Punkt: aktueller Arbeitspunkt', pad.l + 42, pad.t + 48);
+
+        // Axis titles
         ctx.fillStyle = '#1e3248';
         ctx.font = '22px Arial';
-        ctx.fillText('Tankdruck p2 [bar abs]', w / 2 - 110, h - 20);
+        ctx.fillText('Tankdruck p2 [bar abs]', w / 2 - 110, h - 26);
         ctx.save();
-        ctx.translate(26, h / 2 + 100);
+        ctx.translate(34, h / 2 + 100);
         ctx.rotate(-Math.PI / 2);
         ctx.fillText('Max. Öffnungsgrad [%]', 0, 0);
         ctx.restore();
@@ -660,7 +772,8 @@
 
       function calculate() {
         const s = getState();
-        const valid = [s.qnMax, s.kvs, s.p1, s.p2, s.density, s.temp, s.testOpening].every(v => Number.isFinite(v));
+        const validityValues = [s.qnMax, s.kvs, s.p1, s.p2, s.density, s.temp, ...(s.showTestOpening ? [s.testOpening] : [])];
+        const valid = validityValues.every(v => Number.isFinite(v));
         if (!valid || s.density <= 0 || s.qnMax < 0 || s.kvs <= 0 || s.p1 < 0 || s.p2 < 0 || s.temp <= -273.15) {
           resetOutputs();
           setStatus('warn', 'Ungültige Eingaben');
@@ -680,12 +793,12 @@
 
         el.outDp.textContent = core.dp.toFixed(3);
         el.outDpEff.textContent = core.dpEff.toFixed(3);
-        el.outKvEff.textContent = core.kvEffAtTest.toFixed(4);
+        el.outKvEff.textContent = s.showTestOpening ? core.kvEffAtTest.toFixed(4) : openingToKvEff(100, s.kvs, s.valveChar).toFixed(4);
         el.outMaxOpening.textContent = core.maxOpening.toFixed(2);
         el.outQnAtMax.textContent = core.qnMaxOpen.toFixed(2);
         el.outQnAtTest.textContent = core.qnTest.toFixed(2);
 
-        if (core.qnTest > s.qnMax) setStatus('warn', 'Testöffnung überschreitet Anschlusswert');
+        if (s.showTestOpening && core.qnTest > s.qnMax) setStatus('warn', 'Testöffnung überschreitet Anschlusswert');
         else setStatus('ok', 'Berechnung gültig');
 
         if (s.calcModel === 'enhanced') {
@@ -814,7 +927,7 @@
       function applyStoredState() {
         const defaults = {
           qnMax: 420, kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, testOpening: 50,
-          dpLimit: true, showFormula: true, showTestOpening: true, valveChar: 'linear', calcModel: 'simple', chartOpen: false
+          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false
         };
         const saved = loadUserValues();
         const merged = { ...defaults, ...(saved || {}) };

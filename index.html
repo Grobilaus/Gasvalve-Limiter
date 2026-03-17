@@ -300,7 +300,12 @@
     <main class="grid">
       <section class="card panel">
         <h2>Eingaben</h2>
-        <div class="field"><div class="label-row"><label for="qnMax">Max. Normvolumenstrom QN max [Nm³/h]</label><button class="mini-info" data-info="qnmax" type="button">!</button></div><input id="qnMax" type="number" step="0.1" /></div>
+        <div class="field">
+          <div class="label-row"><label>Eingabeeinheit</label></div>
+          <label style="margin-right:1rem;"><input type="radio" name="flowUnit" id="flowUnitNm" value="Nm3h" checked /> Nm³/h</label>
+          <label><input type="radio" name="flowUnit" id="flowUnitKg" value="kgh" /> kg/h</label>
+        </div>
+        <div class="field"><div class="label-row"><label for="qnMax" id="qnMaxLabel">Max. Normvolumenstrom QN max [Nm³/h]</label><button class="mini-info" data-info="qnmax" type="button">!</button></div><input id="qnMax" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="kvs">Kvs [-]</label><button class="mini-info" data-info="kvs" type="button">!</button></div><input id="kvs" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="p1">Druck vor Ventil p1 [bar abs]</label><button class="mini-info" data-info="p1" type="button">!</button></div><input id="p1" type="number" step="0.1" /></div>
         <div class="field"><div class="label-row"><label for="p2">Druck nach Ventil p2 [bar abs]</label><button class="mini-info" data-info="p2" type="button">!</button></div><input id="p2" type="number" step="0.1" /></div>
@@ -322,8 +327,8 @@
           <div class="result-box" id="dpEffBox"><div class="result-name">Δp_eff [bar] <button class="mini-info" data-info="dpEff" type="button">!</button></div><div class="result-value" id="outDpEff">-</div></div>
           <div class="result-box"><div class="result-name" id="kvEffLabel"><span id="kvEffText">Kv_eff bei Testöffnung [-]</span> <button class="mini-info" data-info="kvEff" type="button">!</button></div><div class="result-value" id="outKvEff">-</div></div>
           <div class="result-box"><div class="result-name">Max. Öffnungsgrad [%] <button class="mini-info" data-info="maxOpening" type="button">!</button></div><div class="result-value" id="outMaxOpening">-</div></div>
-          <div class="result-box"><div class="result-name">QN bei max. Öffnung [Nm³/h] <button class="mini-info" data-info="qnAtMax" type="button">!</button></div><div class="result-value" id="outQnAtMax">-</div></div>
-          <div class="result-box" id="testOpeningResult"><div class="result-name">QN bei Testöffnung [Nm³/h] <button class="mini-info" data-info="qnAtTest" type="button">!</button></div><div class="result-value" id="outQnAtTest">-</div></div>
+          <div class="result-box"><div class="result-name"><span id="qnAtMaxLabel">QN bei max. Öffnung [Nm³/h]</span> <button class="mini-info" data-info="qnAtMax" type="button">!</button></div><div class="result-value" id="outQnAtMax">-</div></div>
+          <div class="result-box" id="testOpeningResult"><div class="result-name"><span id="qnAtTestLabel">QN bei Testöffnung [Nm³/h]</span> <button class="mini-info" data-info="qnAtTest" type="button">!</button></div><div class="result-value" id="outQnAtTest">-</div></div>
         </div>
         <div class="status" id="statusBox"></div>
         <div class="note" id="noteBox"></div>
@@ -350,6 +355,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const STORAGE_KEY = 'gasLimiterState_v1';
       const RANGEABILITY = 50;
+      const RHO_N_AIR = 1.293;
       const gasPresetMap = [
         { name: 'Luft', value: 1.0 },
         { name: 'CO₂', value: 1.53 },
@@ -360,7 +366,7 @@
       ];
 
       const infoContent = {
-        qnmax: { title: 'QN max', desc: 'Maximal erlaubter Normvolumenstrom des Anschlusses in Nm³/h.' },
+        qnmax: { title: 'Anschlusswert', desc: 'Maximal erlaubter Anschlusswert als Normvolumenstrom [Nm³/h] oder Massenstrom [kg/h], je nach gewählter Eingabeeinheit.' },
         kvs: { title: 'Kvs', desc: 'Ventilkennwert bei 100 % Öffnung.' },
         p1: { title: 'p1', desc: 'Absolutdruck vor dem Ventil.' },
         p2: { title: 'p2', desc: 'Absolutdruck nach dem Ventil.' },
@@ -371,12 +377,15 @@
         dpEff: { title: 'Δp_eff', desc: 'Effektive Druckdifferenz mit optionaler Begrenzung auf 0.5 · p1.' },
         kvEff: { title: 'Kv_eff', desc: 'Effektiver Kv-Wert am Test-Öffnungsgrad entsprechend der Ventilkennlinie.' },
         maxOpening: { title: 'Max. Öffnungsgrad', desc: 'Größter Öffnungsgrad, bei dem QN den Anschlusswert nicht überschreitet.' },
-        qnAtMax: { title: 'QN bei max. Öffnung', desc: 'Berechneter Durchfluss bei 100 % Öffnung (Referenzpunkt).' },
-        qnAtTest: { title: 'QN bei Testöffnung', desc: 'Berechneter Durchfluss am eingestellten Test-Öffnungsgrad.' }
+        qnAtMax: { title: 'Durchfluss bei max. Öffnung', desc: 'Berechneter Durchfluss bei 100 % Öffnung (Referenzpunkt), in der gewählten Einheit.' },
+        qnAtTest: { title: 'Durchfluss bei Testöffnung', desc: 'Berechneter Durchfluss am eingestellten Test-Öffnungsgrad, in der gewählten Einheit.' }
       };
 
       const el = {
+        flowUnitNm: document.getElementById('flowUnitNm'),
+        flowUnitKg: document.getElementById('flowUnitKg'),
         qnMax: document.getElementById('qnMax'),
+        qnMaxLabel: document.getElementById('qnMaxLabel'),
         kvs: document.getElementById('kvs'),
         p1: document.getElementById('p1'),
         p2: document.getElementById('p2'),
@@ -392,6 +401,8 @@
         outMaxOpening: document.getElementById('outMaxOpening'),
         outQnAtMax: document.getElementById('outQnAtMax'),
         outQnAtTest: document.getElementById('outQnAtTest'),
+        qnAtMaxLabel: document.getElementById('qnAtMaxLabel'),
+        qnAtTestLabel: document.getElementById('qnAtTestLabel'),
         statusBox: document.getElementById('statusBox'),
         noteBox: document.getElementById('noteBox'),
         formulaBox: document.getElementById('formulaBox'),
@@ -423,9 +434,42 @@
       const settingsInputs = [...limitIds, ...defaultIds, 'showFormula', 'showTestOpening', 'dpLimit', 'valveChar', 'calcModel']
         .map(id => document.getElementById(id));
 
+      function getFlowUnit() {
+        return el.flowUnitKg.checked ? 'kgh' : 'Nm3h';
+      }
+
+      function gasRhoN(density) {
+        return density * RHO_N_AIR;
+      }
+
+      function flowToNm3h(flowValue, flowUnit, density) {
+        if (flowUnit === 'kgh') return flowValue / Math.max(gasRhoN(density), 1e-9);
+        return flowValue;
+      }
+
+      function flowFromNm3h(flowNm3h, flowUnit, density) {
+        if (flowUnit === 'kgh') return flowNm3h * gasRhoN(density);
+        return flowNm3h;
+      }
+
+      function updateFlowUnitLabels() {
+        const unit = getFlowUnit();
+        if (unit === 'kgh') {
+          el.qnMaxLabel.textContent = 'Max. Massenstrom ṁ max [kg/h]';
+          el.qnAtMaxLabel.textContent = 'ṁ bei max. Öffnung [kg/h]';
+          el.qnAtTestLabel.textContent = 'ṁ bei Testöffnung [kg/h]';
+        } else {
+          el.qnMaxLabel.textContent = 'Max. Normvolumenstrom QN max [Nm³/h]';
+          el.qnAtMaxLabel.textContent = 'QN bei max. Öffnung [Nm³/h]';
+          el.qnAtTestLabel.textContent = 'QN bei Testöffnung [Nm³/h]';
+        }
+      }
+
       function getState() {
         return {
-          qnMax: Number(el.qnMax.value), kvs: Number(el.kvs.value), p1: Number(el.p1.value), p2: Number(el.p2.value),
+          flowUnit: getFlowUnit(),
+          qnMaxInput: Number(el.qnMax.value),
+          qnMax: flowToNm3h(Number(el.qnMax.value), getFlowUnit(), Number(el.density.value)), kvs: Number(el.kvs.value), p1: Number(el.p1.value), p2: Number(el.p2.value),
           density: Number(el.density.value), temp: Number(el.temp.value), testOpening: Number(el.testOpening.value),
           dpLimit: el.dpLimit.checked, showFormula: el.showFormula.checked, showTestOpening: el.showTestOpening.checked,
           valveChar: el.valveChar.value, calcModel: el.calcModel.value, chartOpen: el.chartCard.classList.contains('open')
@@ -469,15 +513,34 @@
         }
         el.formulaBox.style.display = 'block';
         const dpToken = el.dpLimit.checked ? 'Δp_eff' : 'Δp';
+        const unit = getFlowUnit();
+        const conversionLine = 'ρN = d × 1.293 kg/Nm³';
         if (el.calcModel.value === 'simple') {
-          el.formulaBox.textContent = `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d)))`;
+          el.formulaBox.textContent = unit === 'kgh'
+            ? [
+                conversionLine,
+                'QN_max = ṁ_max / ρN',
+                `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d)))`,
+                '↔ direkt: Opening[%] = 100 × ṁ_max / (18.9 × Kvs × √(((Δp_x × (2p1 − Δp_x)) / d)) × ρN)'
+              ].join('\n')
+            : [
+                conversionLine,
+                'ṁ = QN × ρN',
+                `Opening[%] = 100 × QN_max / (18.9 × Kvs × √(((${dpToken} × (2p1 − ${dpToken})) / d)))`
+              ].join('\n');
         } else {
           el.formulaBox.textContent = [
             'Verbessertes Engineering-Modell, aber keine vollständige IEC-60534-Auslegung.',
+            conversionLine,
+            unit === 'kgh' ? 'QN = ṁ / ρN' : 'ṁ = QN × ρN',
             '1) Kv_eff = f(Öffnungsgrad, Kennlinie)',
             '2) F_T = √(293.15 / (273.15 + T))',
-            `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d)) × F_T`,
-            '4) Max. Öffnungsgrad wird numerisch so gesucht, dass QN ≤ QN_max'
+            unit === 'kgh'
+              ? `3) ṁ = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d)) × F_T × ρN`
+              : `3) QN = 18.9 × Kv_eff × √(((${dpToken} × (2p1 − ${dpToken})) / d)) × F_T`,
+            unit === 'kgh'
+              ? '4) Max. Öffnungsgrad wird numerisch so gesucht, dass ṁ ≤ ṁ_max'
+              : '4) Max. Öffnungsgrad wird numerisch so gesucht, dass QN ≤ QN_max'
           ].join('\n');
         }
       }
@@ -585,6 +648,7 @@
       function applySettings() {
         applyInputLimits();
         clampInputsToLimits();
+        updateFlowUnitLabels();
         el.dpEffBox.style.display = el.dpLimit.checked ? 'block' : 'none';
         el.testOpeningResult.style.display = el.showTestOpening.checked ? 'block' : 'none';
         el.testOpening.disabled = !el.showTestOpening.checked;
@@ -772,7 +836,7 @@
 
       function calculate() {
         const s = getState();
-        const validityValues = [s.qnMax, s.kvs, s.p1, s.p2, s.density, s.temp, ...(s.showTestOpening ? [s.testOpening] : [])];
+        const validityValues = [s.qnMaxInput, s.qnMax, s.kvs, s.p1, s.p2, s.density, s.temp, ...(s.showTestOpening ? [s.testOpening] : [])];
         const valid = validityValues.every(v => Number.isFinite(v));
         if (!valid || s.density <= 0 || s.qnMax < 0 || s.kvs <= 0 || s.p1 < 0 || s.p2 < 0 || s.temp <= -273.15) {
           resetOutputs();
@@ -795,8 +859,8 @@
         el.outDpEff.textContent = core.dpEff.toFixed(3);
         el.outKvEff.textContent = s.showTestOpening ? core.kvEffAtTest.toFixed(4) : openingToKvEff(100, s.kvs, s.valveChar).toFixed(4);
         el.outMaxOpening.textContent = core.maxOpening.toFixed(2);
-        el.outQnAtMax.textContent = core.qnMaxOpen.toFixed(2);
-        el.outQnAtTest.textContent = core.qnTest.toFixed(2);
+        el.outQnAtMax.textContent = flowFromNm3h(core.qnMaxOpen, s.flowUnit, s.density).toFixed(2);
+        el.outQnAtTest.textContent = flowFromNm3h(core.qnTest, s.flowUnit, s.density).toFixed(2);
 
         if (s.showTestOpening && core.qnTest > s.qnMax) setStatus('warn', 'Testöffnung überschreitet Anschlusswert');
         else setStatus('ok', 'Berechnung gültig');
@@ -818,7 +882,7 @@
       }
 
       function runTests() {
-        const sample = { kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, dpLimit: true, valveChar: 'linear', calcModel: 'simple' };
+        const sample = { qnMaxInput: 420, qnMax: 420, flowUnit: 'Nm3h', kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, dpLimit: true, valveChar: 'linear', calcModel: 'simple' };
         const eq = openingToKvEff(10, 10, 'equalPercentage');
         const lin = openingToKvEff(10, 10, 'linear');
         console.assert(eq < lin, 'Test 1 failed: equalPercentage at low opening should be lower than linear');
@@ -843,6 +907,8 @@
         console.assert(openingToKvEff(50, 12, 'linear') === 6, 'Test 7 failed: linear Kv_eff at 50%');
 
         const noLimit = calculateCore({ ...sample, p2: 0, dpLimit: false, qnMax: 420, testOpening: 50 });
+
+        console.assert(flowToNm3h(129.3, 'kgh', 1) > 99.9 && flowToNm3h(129.3, 'kgh', 1) < 100.1, 'Test 9 failed: kg/h to Nm3/h conversion');
         console.assert(noLimit.dpTerm === 10, 'Test 8 failed: dpTerm mismatch for p1=10, p2=0 without limit');
       }
 
@@ -890,6 +956,18 @@
           });
         });
 
+        [el.flowUnitNm, el.flowUnitKg].forEach(node => {
+          node.addEventListener('change', () => {
+            const previousUnit = node.id === 'flowUnitKg' ? 'Nm3h' : 'kgh';
+            const currentValue = Number(el.qnMax.value);
+            const density = Number(el.density.value);
+            const asNm3h = flowToNm3h(currentValue, previousUnit, density);
+            el.qnMax.value = flowFromNm3h(asNm3h, getFlowUnit(), density).toFixed(2);
+            applySettings();
+            calculate();
+          });
+        });
+
         settingsInputs.forEach(node => {
           node.addEventListener('input', () => {
             applySettings();
@@ -927,12 +1005,14 @@
       function applyStoredState() {
         const defaults = {
           qnMax: 420, kvs: 10, p1: 10, p2: 5, density: 1.53, temp: 20, testOpening: 50,
-          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false
+          dpLimit: true, showFormula: true, showTestOpening: false, valveChar: 'linear', calcModel: 'simple', chartOpen: false, flowUnit: 'Nm3h'
         };
         const saved = loadUserValues();
         const merged = { ...defaults, ...(saved || {}) };
 
-        el.qnMax.value = merged.qnMax;
+        el.flowUnitNm.checked = (merged.flowUnit || 'Nm3h') !== 'kgh';
+        el.flowUnitKg.checked = (merged.flowUnit || 'Nm3h') === 'kgh';
+        el.qnMax.value = merged.qnMaxInput ?? merged.qnMax;
         el.kvs.value = merged.kvs;
         el.p1.value = merged.p1;
         el.p2.value = merged.p2;
